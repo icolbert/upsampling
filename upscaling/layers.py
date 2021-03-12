@@ -40,7 +40,7 @@ class PixelShuffle:
     def __init__(self, scaling_factor:int):
         self.scaling_factor = scaling_factor
     
-    def __call__(self, x:torch.tensor):
+    def __call__(self, x:torch.tensor) -> torch.tensor:
         Ic, Ih, Iw = x.shape
         output = torch.zeros(( Ic//(self.scaling_factor**2), Ih*self.scaling_factor, Iw*self.scaling_factor))
         Oc, Oh, Ow = output.shape
@@ -72,7 +72,7 @@ class Deconvolution:
         self.padding      = padding
         self.stride       = stride
     
-    def __call__(self, x:torch.tensor):
+    def __call__(self, x:torch.tensor) -> torch.tensor:
         Ic, Ih, Iw = x.shape
         assert Ih == Iw
         assert Ic == self.in_channels
@@ -89,3 +89,33 @@ class Deconvolution:
                                 if oh < Oh and ow < Ow and ow >= 0 and oh >= 0:
                                     output[oc,oh,ow] +=  x[ic,ih,iw] * self.weight[ic,oc,kh,kw]
         return output
+    
+class WeightShuffle:
+    def __init__(self, scaling_factor:int):
+        self.scaling_factor = scaling_factor
+    
+    def __call__(self, conv_weights:torch.tensor) -> torch.tensor:
+        '''
+        Assuming the input weights are convolutions and weights are of the size below
+        
+        convolution.weight.shape = (out_channels, in_channels, kernel_size, kernel_size)
+        deconvolution.weight.shape = (in_channels, out_channels, kernel_size, kernel_size)
+        '''
+        Oc = int(conv_weights.shape[0] / (self.scaling_factor**2))
+        Ic = conv_weights.shape[1]
+        K  = conv_weights.shape[2]
+        Kh = Kw = self.scaling_factor * K
+        deconv_weights = torch.zeros(Ic, Oc, Kh, Kw)
+        for ic_d in range(Ic):
+            for oc_d in range(Oc):
+                for kh_d in range(Kh):
+                    for kw_d in range(Kw):
+                        kh_c = int(np.floor(kh_d / self.scaling_factor))
+                        kw_c = int(np.floor(kw_d / self.scaling_factor))
+                        ic_c = ic_d
+                        _a   = (kh_d % self.scaling_factor)
+                        _b   = (kw_d % self.scaling_factor)
+                        _c   = oc_d
+                        oc_c = (self.scaling_factor**2) * _c + (self.scaling_factor) * _a + _b
+                        deconv_weights[ic_d,oc_d,kh_d,kw_d] = conv_weights[oc_c,ic_c,K - kh_c - 1,K - kw_c - 1]
+        return deconv_weights
