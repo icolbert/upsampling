@@ -1,8 +1,32 @@
-import numpy as np
+import enum
 import torch
+import numpy as np
+
+def modulo(a:int, b:int) -> int:
+    """ modulo operator """
+    return a % b
+
+
+class DeconvolutionAlgorithms(enum.Enum):
+    """
+    Deconvolution Algorithm Enumerations
+    """
+    STDD = 0 # Standard Deconvolution
+    STRD = 1 # Strided Deconvolution
+    REVD = 2 # Reverse Deconvolution
+    TDC  = 3 # Transforming Deconvolution to Convolution
 
 
 class Conv2d:
+    """
+    2-D Convolution Layer - Coded for clarity, not speed
+
+    `in_channels`:int - the number of input channels
+    `out_channels`:int - the number of output channels
+    `kernel_size`:int - the size of the kernel (assuming a square kernel)
+    `stride`:int - kernel stride (default=1)
+    `padding`:int - padding of the input feature map (default=0)
+    """
     def __init__(self,
                  in_channels:int,
                  out_channels:int,
@@ -37,6 +61,11 @@ class Conv2d:
 
     
 class PixelShuffle:
+    """
+    Pixel Shuffle Layer - Coded for clarity, not speed
+
+    `scaling_factor`:int - the upsampling factor
+    """
     def __init__(self, scaling_factor:int):
         self.scaling_factor = scaling_factor
     
@@ -57,13 +86,24 @@ class PixelShuffle:
                     output[oc,oh,ow] = x[ic,ih,iw]
         return output
 
+
 class Deconvolution:
+    """
+    Deconvolution Layer - Coded for clarity, not speed
+
+    `in_channels`:int - the number of input channels
+    `out_channels`:int - the number of output channels
+    `kernel_size`:int - the size of the kernel (assuming a square kernel)
+    `stride`:int - kernel stride (default=1)
+    `padding`:int - padding of the input feature map (default=0)
+    """
     def __init__(self,
                  in_channels:int,
                  out_channels:int,
                  kernel_size:int,
                  stride:int = 1,
-                 padding:int = 0):
+                 padding:int = 0,
+                 algorithm:DeconvolutionAlgorithms = DeconvolutionAlgorithms.STDD):
         self.weight = torch.randn(in_channels, out_channels, kernel_size, kernel_size)
 
         self.kernel_size  = kernel_size
@@ -71,8 +111,19 @@ class Deconvolution:
         self.out_channels = out_channels
         self.padding      = padding
         self.stride       = stride
+        self.algorithm    = algorithm
     
     def __call__(self, x:torch.tensor) -> torch.tensor:
+        if self.algorithm == DeconvolutionAlgorithms.STDD:
+            return self.standard_deconvolution(x)
+        elif self.algorithm == DeconvolutionAlgorithms.STRD:
+            raise NotImplementedError("Strided deconvolution (STRD) is not yet implemented.")
+        elif self.algorithm == DeconvolutionAlgorithms.REVD:
+            return self.reverse_deconvolution(x)
+        elif self.algorithm == DeconvolutionAlgorithms.TDC:
+            raise NotImplementedError("Transforming Deconvolution to Convolution (TDC) is not yet implemented.")
+
+    def standard_deconvolution(self, x:torch.tensor) -> torch.tensor:
         Ic, Ih, Iw = x.shape
         assert Ih == Iw
         assert Ic == self.in_channels
@@ -89,18 +140,43 @@ class Deconvolution:
                                 if oh < Oh and ow < Ow and ow >= 0 and oh >= 0:
                                     output[oc,oh,ow] +=  x[ic,ih,iw] * self.weight[ic,oc,kh,kw]
         return output
-    
+
+    def reverse_deconvolution(self, x:torch.tensor) -> torch.tensor:
+        Ic, Ih, Iw = x.shape
+        assert Ih == Iw
+        assert Ic == self.in_channels
+        Oh = Ow = (Ih - 1) * self.stride - 2 * self.padding + (self.kernel_size - 1) + 1
+        output = torch.zeros((self.out_channels, Oh, Ow))
+        for oc in range(self.out_channels):
+            for ic in range(self.in_channels):
+                for kh in range(self.kernel_size):
+                    for kw in range(self.kernel_size):
+                        for oh_ in range(0, Oh, self.stride):
+                            for ow_ in range(0, Ow, self.stride):
+                                oh = oh_ + modulo(self.stride - modulo(self.padding - kh, self.stride), self.stride)
+                                ow = ow_ + modulo(self.stride - modulo(self.padding - kw, self.stride), self.stride)
+                                ih = (oh + self.padding - kh) // self.stride
+                                iw = (ow + self.padding - kw) // self.stride
+                                if ih < Ih and iw < Iw and iw >= 0 and ih >= 0:
+                                    output[oc,oh,ow] +=  x[ic,ih,iw] * self.weight[ic,oc,kh,kw]
+        return output
+
+
+
 class WeightShuffle:
+    """
+    Weight Shuffle Layer - Coded for clarity, not speed
+
+    Assuming the input weights are convolutions and weights are of the size below (aligned with PyTorch)
+      convolution.weight.shape = (out_channels, in_channels, kernel_size, kernel_size)
+      deconvolution.weight.shape = (in_channels, out_channels, kernel_size, kernel_size)
+
+    `scaling_factor`:int - the upsampling factor
+    """
     def __init__(self, scaling_factor:int):
         self.scaling_factor = scaling_factor
     
     def __call__(self, conv_weights:torch.tensor) -> torch.tensor:
-        '''
-        Assuming the input weights are convolutions and weights are of the size below
-        
-        convolution.weight.shape = (out_channels, in_channels, kernel_size, kernel_size)
-        deconvolution.weight.shape = (in_channels, out_channels, kernel_size, kernel_size)
-        '''
         Oc = int(conv_weights.shape[0] / (self.scaling_factor**2))
         Ic = conv_weights.shape[1]
         K  = conv_weights.shape[2]
@@ -119,3 +195,4 @@ class WeightShuffle:
                         oc_c = (self.scaling_factor**2) * _c + (self.scaling_factor) * _a + _b
                         deconv_weights[ic_d,oc_d,kh_d,kw_d] = conv_weights[oc_c,ic_c,K - kh_c - 1,K - kw_c - 1]
         return deconv_weights
+
