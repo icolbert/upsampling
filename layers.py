@@ -199,7 +199,54 @@ class Deconvolution:
         return output
 
     def transforming_convolution_to_deconvolution(self, x:torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError("Transforming deconvolution to convolution (TDC) is not yet implemented.")
+        Ic, Ih, Iw = x.shape
+        assert Ih == Iw
+        assert Ic == self.in_channels
+        KC = int(np.ceil(self.kernel_size / self.stride)) # size of the convolution kernel
+        PK = int(self.stride * KC - self.kernel_size)     # padding of the kernel
+        PI = int(KC - 1)                                  # padding of the input
+
+        # augment(pad) kernel and allocate transformed kernels
+        K_padded = torch.zeros((self.in_channels, self.out_channels, self.kernel_size + PK, self.kernel_size + PK))
+        K_padded[:,:,PK:,PK:] = self.weight # <Ic,Oc,Kh,Kw>
+        Kc = torch.zeros((self.in_channels, self.out_channels, self.stride**2, KC, KC)) # <Ic,Oc,S^2,Kh,Kw>
+
+        # pad input
+        I_padded = torch.zeros((self.in_channels, Ih + 2 * PI, Iw + 2 * PI))
+        I_padded[:,PI: PI + Ih, PI:PI + Iw] = x
+
+        # determine weights of transformed kernels
+        for h in range(self.kernel_size + PK):
+            for w in range(self.kernel_size + PK):
+                for oc in range(self.out_channels):
+                    for ic in range(self.in_channels):
+                        Kc_h = int(KC - np.ceil((h + 1) / self.stride))
+                        Kc_w = int(KC - np.ceil((w + 1) / self.stride))
+                        Kc_n = int(self.stride * (h % self.stride) + (w % self.stride))
+                        Kc[ic, oc, Kc_n, Kc_h, Kc_w] = K_padded[ic, oc, h, w]
+
+        Oh = Ow = (Ih - 1) * self.stride - 2 * self.padding + (self.kernel_size - 1) + 1
+        Th = Tw = Ih + 2 * PI - KC + 1
+        output = torch.zeros((self.out_channels, Oh, Ow))
+        for oc in range(self.out_channels):
+            # Output Split CNN Buffer (unstitched)
+            temp_split = np.zeros((Oh // self.stride, Ow // self.stride, self.stride ** 2))
+            for ic in range(self.in_channels):
+                for os in range(self.stride ** 2): # Parallelize this loop
+                    for _oh in range(Th):
+                        for _ow in range(Tw):
+                            for _kh in range(KC):
+                                for _kw in range(KC):
+                                    ow = int(_ow * self.stride + (os % self.stride))
+                                    oh = int(_oh * self.stride + (os // self.stride))
+                                    kh = _oh + _kh 
+                                    kw = _ow + _kw
+                                    x = I_padded[ic, _kh, _kw]
+                                    w = Kc[ic, oc, os, kh, kw]
+                                    temp_split[_oh, _ow, os] += x * w
+                    # Output pixel look-up for stitching
+                    output[oc, oh, ow] += temp_split[_oh, _ow, os]
+        return output
 
     def strided_deconvolution(self, x:torch.Tensor) -> torch.Tensor:
         raise NotImplementedError("Strided deconnvolution (STRD) is not yet implemented.")
