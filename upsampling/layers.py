@@ -108,22 +108,5 @@ class WeightShuffle:
         self.scaling_factor = scaling_factor
     
     def __call__(self, conv_weights:torch.tensor) -> torch.tensor:
-        Oc = int(conv_weights.shape[0] / (self.scaling_factor**2))
-        Ic = conv_weights.shape[1]
-        K  = conv_weights.shape[2]
-        Kh = Kw = self.scaling_factor * K
-        deconv_weights = torch.zeros(Ic, Oc, Kh, Kw)
-        for ic_d in range(Ic):
-            for oc_d in range(Oc):
-                for kh_d in range(Kh):
-                    for kw_d in range(Kw):
-                        kh_c = int(np.floor(kh_d / self.scaling_factor))
-                        kw_c = int(np.floor(kw_d / self.scaling_factor))
-                        ic_c = ic_d
-                        _a   = (kh_d % self.scaling_factor)
-                        _b   = (kw_d % self.scaling_factor)
-                        _c   = oc_d
-                        oc_c = (self.scaling_factor**2) * _c + (self.scaling_factor) * _a + _b
-                        deconv_weights[ic_d,oc_d,kh_d,kw_d] = conv_weights[oc_c,ic_c,K - kh_c - 1,K - kw_c - 1]
-        return deconv_weights
+        return weight_shuffle(conv_weights, scaling_factor=self.scaling_factor)
 

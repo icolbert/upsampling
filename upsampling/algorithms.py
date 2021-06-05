@@ -51,6 +51,30 @@ def pixel_shuffle(x:torch.Tensor, scaling_factor:int) -> torch.Tensor:
     return output
 
 
+def weight_shuffle(conv_weights:torch.Tensor, scaling_factor:int) -> torch.Tensor:
+    """
+    Weight Shuffle - coded for clarity, not speed
+    """
+    Oc = int(conv_weights.shape[0] / (scaling_factor**2))
+    Ic = conv_weights.shape[1]
+    K  = conv_weights.shape[2]
+    Kh = Kw = scaling_factor * K
+    deconv_weights = torch.zeros(Ic, Oc, Kh, Kw)
+    for ic_d in range(Ic):
+        for oc_d in range(Oc):
+            for kh_d in range(Kh):
+                for kw_d in range(Kw):
+                    kh_c = int(np.floor(kh_d / scaling_factor))
+                    kw_c = int(np.floor(kw_d / scaling_factor))
+                    ic_c = ic_d
+                    _a   = (kh_d % scaling_factor)
+                    _b   = (kw_d % scaling_factor)
+                    _c   = oc_d
+                    oc_c = (scaling_factor**2) * _c + (scaling_factor) * _a + _b
+                    deconv_weights[ic_d,oc_d,kh_d,kw_d] = conv_weights[oc_c,ic_c,K - kh_c - 1,K - kw_c - 1]
+    return deconv_weights
+
+
 def standard_deconvolution(x:torch.Tensor, weight:torch.Tensor, in_channels:int, out_channels:int, kernel_size:int = 3, padding:int = 0, stride:int = 1) -> torch.Tensor:
     """
     Standard Deconvolution (STDD) - coded for clarity, not speed
@@ -128,7 +152,6 @@ def reverse_deconvolution_2(x:torch.Tensor, weight:torch.Tensor, in_channels:int
                                 kh < kernel_size and kw < kernel_size:
                                 output[oc,oh,ow] +=  x[ic,ih,iw] * weight[ic,oc,kh,kw]
     return output
-
 
 class KernelOffsetCounter:
     def __init__(self, offset_init:int = 0, cliff:int = 1) -> None:
