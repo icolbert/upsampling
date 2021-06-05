@@ -30,8 +30,9 @@ class Conv2d:
         self.stride       = stride
     
     def __call__(self, x:torch.tensor) -> torch.tensor:
-        return convolution_2d(x, weight=self.weight, in_channels=self.in_channels, out_channels=self.out_channels,
-            kernel_size=self.kernel_size, padding=self.padding, stride=self.stride)
+        return convolution_2d(x, weight=self.weight, in_channels=self.in_channels,
+            out_channels=self.out_channels, kernel_size=self.kernel_size, padding=self.padding,
+                stride=self.stride)
 
     
 class PixelShuffle:
@@ -76,7 +77,9 @@ class Deconvolution:
     def __call__(self, x:torch.Tensor) -> torch.Tensor:
 
         if self.algorithm == DeconvolutionAlgorithms.STDD:
-            return self.standard_deconvolution(x)
+            return standard_deconvolution(x, weight=self.weight, in_channels=self.in_channels,
+                out_channels=self.out_channels, kernel_size=self.kernel_size, padding=self.padding,
+                    stride=self.stride)
 
         elif self.algorithm == DeconvolutionAlgorithms.STRD:
             return self.strided_deconvolution(x)
@@ -89,24 +92,6 @@ class Deconvolution:
 
         elif self.algorithm == DeconvolutionAlgorithms.TDC:
             return self.transforming_convolution_to_deconvolution(x)
-
-    def standard_deconvolution(self, x:torch.Tensor) -> torch.Tensor:
-        Ic, Ih, Iw = x.shape
-        assert Ih == Iw
-        assert Ic == self.in_channels
-        Oh = Ow = (Ih - 1) * self.stride - 2 * self.padding + (self.kernel_size - 1) + 1
-        output = torch.zeros((self.out_channels, Oh, Ow))
-        for oc in range(self.out_channels):
-            for ic in range(self.in_channels):
-                for kh in range(self.kernel_size):
-                    for kw in range(self.kernel_size):
-                        for ih in range(Ih):
-                            for iw in range(Iw):
-                                oh = (self.stride * ih) + kh - self.padding
-                                ow = (self.stride * iw) + kw - self.padding
-                                if oh < Oh and ow < Ow and ow >= 0 and oh >= 0:
-                                    output[oc,oh,ow] +=  x[ic,ih,iw] * self.weight[ic,oc,kh,kw]
-        return output
 
     def reverse_deconvolution(self, x:torch.Tensor) -> torch.Tensor:
         Ic, Ih, Iw = x.shape
