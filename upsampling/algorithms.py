@@ -8,6 +8,10 @@ def modulo(a:int, b:int) -> int:
     return a % b
 
 
+def round(x:torch.Tensor, n_digits:int) -> torch.Tensor:
+    return torch.round(x * 10**n_digits) / (10**n_digits)
+
+
 def convolution_2d(x:torch.Tensor, weight:torch.Tensor, in_channels:int, out_channels:int, kernel_size:int = 3, padding:int = 0, stride:int = 1) -> torch.Tensor:
     """
     2D Convolution - coded for clarity, not for speed
@@ -73,6 +77,22 @@ def weight_shuffle(conv_weights:torch.Tensor, scaling_factor:int) -> torch.Tenso
                     oc_c = (scaling_factor**2) * _c + (scaling_factor) * _a + _b
                     deconv_weights[ic_d,oc_d,kh_d,kw_d] = conv_weights[oc_c,ic_c,K - kh_c - 1,K - kw_c - 1]
     return deconv_weights
+
+
+def weight_convolution(conv_weights:torch.Tensor, in_channels:int, out_channels:int, scaling_factor:int, kernel_size:int = 3):
+    """
+    Weight Convolution - coded for clarity, not speed
+
+    conv_weights.shape = OC x IC x Kc x Kc, where Kc is the convolution kernel size
+    deconv_weights.shape = IC x OC x Kd x Kd, where Kd is the deconvolution kernel size
+    """
+    z = torch.zeros(in_channels, out_channels, 2 + scaling_factor, 2 + scaling_factor)
+    for oc in range(out_channels):
+        for ic in range(in_channels):
+            for i in range(0, scaling_factor):
+                for j in range(0, scaling_factor):
+                    z[ic,oc,i:i+kernel_size,j:j+kernel_size] += torch.rot90(conv_weights.data[oc,ic], 2, [0,1])
+    return z
 
 
 def standard_deconvolution(x:torch.Tensor, weight:torch.Tensor, in_channels:int, out_channels:int, kernel_size:int = 3, padding:int = 0, stride:int = 1) -> torch.Tensor:

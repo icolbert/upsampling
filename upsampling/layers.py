@@ -1,5 +1,5 @@
 import torch
-import numpy as np
+import torch.nn as nn
 
 from .enums import DeconvolutionAlgorithms
 from .algorithms import *
@@ -65,6 +65,27 @@ class SubPixelConvolution:
         h = self.convolution(x)
         h = self.pixel_shuffle(h)
         return h
+
+
+class ResizeConvolution:
+    """
+    Resize Convolution - Coded for clarity, not speed
+    """
+    def __init__(self,
+                 scaling_factor:int,
+                 in_channels:int,
+                 out_channels:int,
+                 kernel_size:int = 3,
+                 stride:int = 1,
+                 padding:int = 1):
+        self.nn_interpolation = nn.Upsample(scale_factor=scaling_factor, mode='nearest')
+        self.convolution = Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, padding=padding, stride=stride)
+
+    def __call__(self, x:torch.tensor) -> torch.tensor:
+        h = self.nn_interpolation(x.unsqueeze(0))
+        h = self.convolution(h.squeeze(0))
+        return h
+
 
 class Deconvolution:
     """
