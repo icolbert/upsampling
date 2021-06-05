@@ -2,6 +2,12 @@ import torch
 
 import numpy as np
 
+
+def modulo(a:int, b:int) -> int:
+    """ modulo operator """
+    return a % b
+
+
 def convolution_2d(x:torch.Tensor, weight:torch.Tensor, in_channels:int, out_channels:int, kernel_size:int = 3, padding:int = 0, stride:int = 1) -> torch.Tensor:
     """
     2D Convolution - coded for clarity, not for speed
@@ -46,6 +52,9 @@ def pixel_shuffle(x:torch.Tensor, scaling_factor:int) -> torch.Tensor:
 
 
 def standard_deconvolution(x:torch.Tensor, weight:torch.Tensor, in_channels:int, out_channels:int, kernel_size:int = 3, padding:int = 0, stride:int = 1) -> torch.Tensor:
+    """
+    Standard Deconvolution (STDD) - coded for clarity, not speed
+    """
     Ic, Ih, Iw = x.shape
     assert Ih == Iw
     assert Ic == in_channels
@@ -62,3 +71,71 @@ def standard_deconvolution(x:torch.Tensor, weight:torch.Tensor, in_channels:int,
                             if oh < Oh and ow < Ow and ow >= 0 and oh >= 0:
                                 output[oc,oh,ow] +=  x[ic,ih,iw] * weight[ic,oc,kh,kw]
     return output
+
+
+def reverse_deconvolution(x:torch.Tensor, weight:torch.Tensor, in_channels:int, out_channels:int, kernel_size:int = 3, padding:int = 0, stride:int = 1) -> torch.Tensor:
+    """
+    Reverse Deconvolution (REVD) - coded for clarity, not speed
+    """
+    Ic, Ih, Iw = x.shape
+    assert Ih == Iw
+    assert Ic == in_channels
+    Oh = Ow = (Ih - 1) * stride - 2 * padding + (kernel_size - 1) + 1
+    output = torch.zeros((out_channels, Oh, Ow))
+    for oc in range(out_channels):
+        for ic in range(in_channels):
+            for kh in range(kernel_size):
+                for kw in range(kernel_size):
+                    for oh_ in range(0, Oh, stride):
+                        for ow_ in range(0, Ow, stride):
+                            oh = oh_ + modulo(stride - modulo(padding - kh, stride), stride)
+                            ow = ow_ + modulo(stride - modulo(padding - kw, stride), stride)
+                            ih = (oh + padding - kh) // stride
+                            iw = (ow + padding - kw) // stride
+                            if ih < Ih and iw < Iw and iw >= 0 and ih >= 0:
+                                output[oc,oh,ow] +=  x[ic,ih,iw] * weight[ic,oc,kh,kw]
+    return output
+
+
+def reverse_deconvolution_2(x:torch.Tensor, weight:torch.Tensor, in_channels:int, out_channels:int, kernel_size:int = 3, padding:int = 0, stride:int = 1) -> torch.Tensor:
+    """
+    Improved Reverse Deconvolution (REVD2) - coded for clarity, not speed
+    """
+    Ic, Ih, Iw = x.shape
+    assert Ih == Iw
+    assert Ic == in_channels
+    Oh = Ow = (Ih - 1) * stride - 2 * padding + (kernel_size - 1) + 1
+    output = torch.zeros((out_channels, Oh, Ow))
+    # for the sub-pixel translation, modulo(self.padding, self.stride) = 0
+    # this is currently set to generalize for upscaling my non-integer numbers
+    kh_offset = KernelOffsetCounter(modulo(padding, stride), stride)
+    kw_offset = KernelOffsetCounter(modulo(padding, stride), stride)
+    for oc in range(out_channels):
+        for oh in range(Oh):
+            fh = kh_offset.next()
+            for ow in range(Ow):
+                fw = kw_offset.next()
+                for ic in range(in_channels):
+                    for kh_ in range(0, kernel_size, stride):
+                        for kw_ in range(0, kernel_size, stride):
+                            kh = kh_ + fh
+                            kw = kw_ + fw
+                            # kh = kh_ + modulo(oh + self.padding, self.stride) # without using the offset counter
+                            # kw = kw_ + modulo(ow + self.padding, self.stride) # without using the offset counter
+                            ih = (oh + padding - kh) // stride
+                            iw = (ow + padding - kw) // stride
+                            if ih < Ih and iw < Iw and iw >= 0 and ih >= 0 and \
+                                kh < kernel_size and kw < kernel_size:
+                                output[oc,oh,ow] +=  x[ic,ih,iw] * weight[ic,oc,kh,kw]
+    return output
+
+
+class KernelOffsetCounter:
+    def __init__(self, offset_init:int = 0, cliff:int = 1) -> None:
+        self._val = offset_init
+        self._cliff = cliff
+    
+    def next(self) -> int:
+        t = self._val
+        self._val = (t + 1) if (t + 1) < self._cliff else 0
+        return t

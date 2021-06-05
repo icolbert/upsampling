@@ -3,7 +3,6 @@ import numpy as np
 
 from .enums import DeconvolutionAlgorithms
 from .algorithms import *
-from .utils import modulo
 
 class Conv2d:
     """
@@ -81,82 +80,19 @@ class Deconvolution:
                 out_channels=self.out_channels, kernel_size=self.kernel_size, padding=self.padding,
                     stride=self.stride)
 
-        elif self.algorithm == DeconvolutionAlgorithms.STRD:
-            return self.strided_deconvolution(x)
-
         elif self.algorithm == DeconvolutionAlgorithms.REVD:
-            return self.reverse_deconvolution(x)
+            return reverse_deconvolution(x, weight=self.weight, in_channels=self.in_channels,
+                out_channels=self.out_channels, kernel_size=self.kernel_size, padding=self.padding,
+                    stride=self.stride)
 
         elif self.algorithm == DeconvolutionAlgorithms.REVD2:
-            return self.reverse_deconvolution_2(x)
+            return reverse_deconvolution_2(x, weight=self.weight, in_channels=self.in_channels,
+                out_channels=self.out_channels, kernel_size=self.kernel_size, padding=self.padding,
+                    stride=self.stride)
 
-        elif self.algorithm == DeconvolutionAlgorithms.TDC:
-            return self.transforming_convolution_to_deconvolution(x)
+        else:
+            raise Exception(f"{self.algorithm} is not yet supported by this layer.")
 
-    def reverse_deconvolution(self, x:torch.Tensor) -> torch.Tensor:
-        Ic, Ih, Iw = x.shape
-        assert Ih == Iw
-        assert Ic == self.in_channels
-        Oh = Ow = (Ih - 1) * self.stride - 2 * self.padding + (self.kernel_size - 1) + 1
-        output = torch.zeros((self.out_channels, Oh, Ow))
-        for oc in range(self.out_channels):
-            for ic in range(self.in_channels):
-                for kh in range(self.kernel_size):
-                    for kw in range(self.kernel_size):
-                        for oh_ in range(0, Oh, self.stride):
-                            for ow_ in range(0, Ow, self.stride):
-                                oh = oh_ + modulo(self.stride - modulo(self.padding - kh, self.stride), self.stride)
-                                ow = ow_ + modulo(self.stride - modulo(self.padding - kw, self.stride), self.stride)
-                                ih = (oh + self.padding - kh) // self.stride
-                                iw = (ow + self.padding - kw) // self.stride
-                                if ih < Ih and iw < Iw and iw >= 0 and ih >= 0:
-                                    output[oc,oh,ow] +=  x[ic,ih,iw] * self.weight[ic,oc,kh,kw]
-        return output
-
-    def reverse_deconvolution_2(self, x:torch.Tensor) -> torch.Tensor:
-        Ic, Ih, Iw = x.shape
-        assert Ih == Iw
-        assert Ic == self.in_channels
-        Oh = Ow = (Ih - 1) * self.stride - 2 * self.padding + (self.kernel_size - 1) + 1
-        output = torch.zeros((self.out_channels, Oh, Ow))
-        # for image upscaling, modulo(self.padding, self.stride) = 0
-        # this is currently set to generalize for upscaling my non-integer numbers
-        kh_offset = KernelOffsetCounter(modulo(self.padding, self.stride), self.stride)
-        kw_offset = KernelOffsetCounter(modulo(self.padding, self.stride), self.stride)
-        for oc in range(self.out_channels):
-            for oh in range(Oh):
-                fh = kh_offset.next()
-                for ow in range(Ow):
-                    fw = kw_offset.next()
-                    for ic in range(self.in_channels):
-                        for kh_ in range(0, self.kernel_size, self.stride):
-                            for kw_ in range(0, self.kernel_size, self.stride):
-                                kh = kh_ + fh
-                                kw = kw_ + fw
-                                # kh = kh_ + modulo(oh + self.padding, self.stride)
-                                # kw = kw_ + modulo(ow + self.padding, self.stride)
-                                ih = (oh + self.padding - kh) // self.stride
-                                iw = (ow + self.padding - kw) // self.stride
-                                if ih < Ih and iw < Iw and iw >= 0 and ih >= 0 and \
-                                    kh < self.kernel_size and kw < self.kernel_size:
-                                    output[oc,oh,ow] +=  x[ic,ih,iw] * self.weight[ic,oc,kh,kw]
-        return output
-
-    def transforming_convolution_to_deconvolution(self, x:torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError("Transforming deconvolution to convolution (TDC) is not yet implemented.")
-
-    def strided_deconvolution(self, x:torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError("Strided deconnvolution (STRD) is not yet implemented.")
-
-class KernelOffsetCounter:
-    def __init__(self, offset_init:int = 0, cliff:int = 1) -> None:
-        self._val = offset_init
-        self._cliff = cliff
-    
-    def next(self) -> int:
-        t = self._val
-        self._val = (t + 1) if (t + 1) < self._cliff else 0
-        return t
 
 class WeightShuffle:
     """
