@@ -47,6 +47,25 @@ class PixelShuffle:
         return pixel_shuffle(x, scaling_factor=self.scaling_factor)
 
 
+class SubPixelConvolution:
+    """
+    Sub-Pixel Convolution - Coded for clarity, not speed
+    """
+    def __init__(self,
+                 scaling_factor:int,
+                 in_channels:int,
+                 out_channels:int,
+                 kernel_size:int = 3,
+                 stride:int = 1,
+                 padding:int = 1):
+        self.convolution = Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, padding=padding, stride=stride)
+        self.pixel_shuffle = PixelShuffle(scaling_factor=scaling_factor)
+    
+    def __call__(self, x:torch.tensor) -> torch.tensor:
+        h = self.convolution(x)
+        h = self.pixel_shuffle(h)
+        return h
+
 class Deconvolution:
     """
     Deconvolution Layer - Coded for clarity, not speed
