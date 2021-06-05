@@ -3,10 +3,7 @@ import numpy as np
 
 from .enums import DeconvolutionAlgorithms
 from .algorithms import *
-
-def modulo(a:int, b:int) -> int:
-    """ modulo operator """
-    return a % b
+from .utils import modulo
 
 class Conv2d:
     """
@@ -47,21 +44,7 @@ class PixelShuffle:
         self.scaling_factor = scaling_factor
     
     def __call__(self, x:torch.tensor) -> torch.tensor:
-        Ic, Ih, Iw = x.shape
-        output = torch.zeros(( Ic//(self.scaling_factor**2), Ih*self.scaling_factor, Iw*self.scaling_factor))
-        Oc, Oh, Ow = output.shape
-        for oc in range(Oc):
-            for oh in range(Oh):
-                for ow in range(Ow):
-                    ih = int(np.floor(oh / self.scaling_factor))
-                    iw = int(np.floor(ow / self.scaling_factor))
-                    
-                    _a = (oh % self.scaling_factor)
-                    _b = (ow % self.scaling_factor)
-                    _c = oc
-                    ic = (self.scaling_factor**2) * _c + (self.scaling_factor) * _a + _b
-                    output[oc,oh,ow] = x[ic,ih,iw]
-        return output
+        return pixel_shuffle(x, scaling_factor=self.scaling_factor)
 
 
 class Deconvolution:
