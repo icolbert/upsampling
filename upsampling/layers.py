@@ -1,22 +1,12 @@
-import enum
 import torch
 import numpy as np
+
+from .enums import DeconvolutionAlgorithms
+from .algorithms import *
 
 def modulo(a:int, b:int) -> int:
     """ modulo operator """
     return a % b
-
-
-class DeconvolutionAlgorithms(enum.Enum):
-    """
-    Deconvolution Algorithm Enumerations
-    """
-    STDD  = 0 # Standard Deconvolution
-    STRD  = 1 # Strided Deconvolution
-    REVD  = 2 # Reverse Deconvolution
-    TDC   = 3 # Transforming Deconvolution to Convolution
-    REVD2 = 4 # Reverse Deconvolution-2
-
 
 class Conv2d:
     """
@@ -43,22 +33,8 @@ class Conv2d:
         self.stride       = stride
     
     def __call__(self, x:torch.tensor) -> torch.tensor:
-        Ic, Ih, Iw = x.shape
-        assert Ih == Iw
-        assert Ic == self.in_channels
-        Oh = Ow = 1 + (Ih - self.kernel_size + 2 * self.padding) // self.stride
-        output = torch.zeros((self.out_channels, Oh, Ow))
-        for oh in range(Oh):
-            for ow in range(Ow):
-                for oc in range(self.out_channels):
-                    for ic in range(self.in_channels):
-                        for kh in range(self.kernel_size):
-                            for kw in range(self.kernel_size):
-                                ih = self.stride * oh + kh - self.padding
-                                iw = self.stride * ow + kw - self.padding
-                                if ih >= 0 and ih < Ih and iw >= 0 and iw < Iw:
-                                    output[oc,oh,ow] += self.weight[oc,ic,kh,kw] * x[ic,ih,iw]
-        return output
+        return convolution_2d(x, weight=self.weight, in_channels=self.in_channels, out_channels=self.out_channels,
+            kernel_size=self.kernel_size, padding=self.padding, stride=self.stride)
 
     
 class PixelShuffle:
