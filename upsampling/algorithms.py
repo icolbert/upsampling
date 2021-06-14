@@ -182,3 +182,32 @@ class KernelOffsetCounter:
         t = self._val
         self._val = (t + 1) if (t + 1) < self._cliff else 0
         return t
+
+
+def fractionally_strided_convolution(x:torch.Tensor, weight:torch.Tensor, in_channels:int, out_channels:int, kernel_size:int = 3, padding:int = 0, stride:int = 1) -> torch.Tensor:
+    """
+    Fractionally Strided Convolution (STRD) - coded for clarity, not speed
+
+    Excerpt from Section 4 of "A guide to convolution arithmetic for deep learning" by Vincent Dumoulin:
+      "Another way to obtain the result of a transposed convolution is to apply an equivalent – but much less efficient – direct convolution."
+    """
+    # inserting zeros into the input space, note that x.shape = (Ic, Ih, Iw)
+    x_ = torch.zeros(
+        x.shape[0],
+        x.shape[1] + (x.shape[1] - 1) * (stride - 1),
+        x.shape[2] + (x.shape[2] - 1) * (stride - 1),
+    )
+    # adding the zeros into the input space for the fractional strides
+    for i in range(x.shape[1]):
+        for j in range(x.shape[2]):
+            ih = i * stride
+            iw = j * stride
+            x_[:, ih, iw] = x[:, i, j]
+    padding = kernel_size - padding - 1 # set the padding for the direct convolution
+    stride = 1 # set the stride for the direct convolution
+    weight = torch.rot90(weight, 2, [2,3]) # need to use the transpose of the kernel
+    weight = torch.movedim(weight, 0, 1) # swapping in_channels, out_channels dimension for deconv/conv translation
+    output = convolution_2d(x_, weight=weight, in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding)
+    return output
+
+

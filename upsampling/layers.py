@@ -130,6 +130,11 @@ class Deconvolution:
                 out_channels=self.out_channels, kernel_size=self.kernel_size, padding=self.padding,
                     stride=self.stride)
 
+        elif self.algorithm == DeconvolutionAlgorithms.STRD:
+            return fractionally_strided_convolution(x, weight=self.weight, in_channels=self.in_channels,
+                out_channels=self.out_channels, kernel_size=self.kernel_size, padding=self.padding,
+                    stride=self.stride)
+
         else:
             raise Exception(f"{self.algorithm} is not yet supported by this layer.")
 
