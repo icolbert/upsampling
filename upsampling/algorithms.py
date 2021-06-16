@@ -211,3 +211,55 @@ def fractionally_strided_convolution(x:torch.Tensor, weight:torch.Tensor, in_cha
     return output
 
 
+def transforming_deconvolution_to_convolution(x:torch.Tensor, weight:torch.Tensor, in_channels:int, out_channels:int, kernel_size:int = 3, padding:int = 0, stride:int = 1) -> torch.Tensor:
+    """
+    Transforming Deconvolution to Convolution (TDC) - coded for clarity, not speed
+
+    x.shape = (in_channels, in_height, in_width)
+    weight.shape = (in_channels, out_channels, kernel_size, kernel_size)
+    output.shape = (out_channels, out_height, out_width)
+    """
+    Ic, Ih, Iw = x.shape
+    Ic, Oc, _, _ = weight.shape
+    assert Ih == Iw
+    assert Ic == in_channels
+    assert Oc == out_channels
+    Oh = Ow = (Ih - 1) * stride - 2 * padding + (kernel_size - 1) + 1
+    output = torch.zeros(Oc, Oh, Ow)
+    # determine size of Kc and padding for original kernel
+    Kt = int(np.ceil(kernel_size / stride)) # split kernel size
+    Pk = stride * Kt - kernel_size # kernel padding
+    Pi = Kt - 1 # input padding
+
+    # determine translated convolution kernel size
+    conv_weights = torch.zeros(out_channels, in_channels, stride**2, Kt, Kt)
+
+    # determine weights of transformed kernels
+    zero_pad = torch.nn.ZeroPad2d(Pk)
+    deconv_weights = zero_pad(weight)
+    for ic in range(in_channels):
+        for oc in range(out_channels):
+            for kh in range(kernel_size + Pk):
+                for kw in range(kernel_size + Pk):
+                    n = stride * modulo(kh, stride) + modulo(kw, stride)
+                    kh_c = Kt - np.ceil((kh + 1) / stride).astype(int)
+                    kw_c = Kt - np.ceil((kw + 1) / stride).astype(int)
+                    conv_weights[oc, ic, n, kh_c, kw_c] = deconv_weights[ic, oc, kh, kw]
+
+    pad_x = torch.nn.ZeroPad2d(Pi // 2) # Pi rows added
+    conv_input = pad_x(x)
+    # compute the convolutions
+    for oc in range(out_channels):
+        for n in range(stride**2): # number of splits along the height
+            for ic in range(in_channels):
+                for _oh in range(Oh // stride): # stride split
+                    for _ow in range(Ow // stride): # stride split
+                        for kh in range(Kt):
+                            for kw in range(Kt):
+                                oh = _oh * stride + (n // stride)
+                                ow = _ow * stride + (n % stride)
+                                ih = _oh + kh
+                                iw = _ow + kw
+                                output[oc, oh, ow] += conv_weights[oc, ic, n, kh, kw] * conv_input[ic, ih, iw]
+    return output
+
