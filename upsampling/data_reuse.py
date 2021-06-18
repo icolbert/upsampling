@@ -1,5 +1,22 @@
 import numpy as np
 
+
+def sub_pixel_convolution_data_reuse_patterns(r, H, C, K):
+    M = (r**2) * (K**2) * (C**2) * (H**2)
+    W = (r**2) * (K**2) * (C**2)
+    A = (H**2) * C + (r**2) * (H**2) * C
+    P = 2 * (r**2) * (H**2) * C # post-processing
+    return M, W, A + P
+
+
+def NN_resize_convolution_data_reuse_patterns(r, H, C, K):
+    M = (r**2) * (K**2) * (C**2) * (H**2)
+    W = (K**2) * (C**2)
+    A = (H**2) * C + (r**2) * (H**2) * C
+    P = 2 * (r**2) * (H**2) * C # pre-processing
+    return M, W, A + P
+
+
 def reverse_looping_deconvolution_data_reuse_patterns(r, H, C, K, original_operator="D-SP"):
     if original_operator == "D-SP":
         # Kd = Kc * r, S = r, P = r
