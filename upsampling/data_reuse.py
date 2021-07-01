@@ -1,18 +1,24 @@
 import numpy as np
 
 
-def sub_pixel_convolution_data_reuse_patterns(r, H, C, K):
+def sub_pixel_convolution_data_reuse_patterns(r, H, C, K, return_total:bool = True):
     M = pow(r, 2) * pow(K, 2) * pow(C, 2) * pow(H, 2)
     W = pow(r, 2) * pow(K, 2) * pow(C, 2)
-    A = (1 + 3 * pow(r, 2)) * pow(H, 2) * C # plus post-processing
-    return M, W, A
+    A = (1 + pow(r, 2)) * pow(H, 2) * C 
+    P = 2 * pow(r, 2) * pow(H, 2) * C # plus post-processing
+    if not return_total:
+        return M, W, A, P
+    return M, W, A + P
 
 
-def NN_resize_convolution_data_reuse_patterns(r, H, C, K):
+def NN_resize_convolution_data_reuse_patterns(r, H, C, K, return_total:bool = True):
     M = pow(r, 2) * pow(K, 2) * pow(C, 2) * pow(H, 2)
     W = pow(K, 2) * pow(C, 2)
-    A = (1 + 3 * pow(r, 2)) * pow(H, 2) * C # plus pre-processing
-    return M, W, A
+    A = 2 * pow(r, 2) * pow(H, 2) * C
+    P = (1 + pow(r, 2)) * pow(H, 2) * C # plus pre-processing
+    if not return_total:
+        return M, W, A, P
+    return M, W, A + P
 
 
 def standard_deconvolution_data_reuse_patterns(r, H, C, K, original_operator="D-SP"):

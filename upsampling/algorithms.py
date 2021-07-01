@@ -79,14 +79,16 @@ def weight_shuffle(conv_weights:torch.Tensor, scaling_factor:int) -> torch.Tenso
     return deconv_weights
 
 
-def weight_convolution(conv_weights:torch.Tensor, in_channels:int, out_channels:int, scaling_factor:int, kernel_size:int = 3):
+def weight_convolution(conv_weights:torch.Tensor, in_channels:int, out_channels:int, scaling_factor:int, kernel_size:int = 3, padding:int = 1):
     """
     Weight Convolution - coded for clarity, not speed
+
+    kernel_size:int - the size of the convolution kernel, K ... the deconvolution kernel size = r + K - 1
 
     conv_weights.shape = OC x IC x Kc x Kc, where Kc is the convolution kernel size
     deconv_weights.shape = IC x OC x Kd x Kd, where Kd is the deconvolution kernel size
     """
-    z = torch.zeros(in_channels, out_channels, 2 + scaling_factor, 2 + scaling_factor)
+    z = torch.zeros(in_channels, out_channels, kernel_size + scaling_factor - 1, kernel_size + scaling_factor - 1)
     for oc in range(out_channels):
         for ic in range(in_channels):
             for i in range(0, scaling_factor):
