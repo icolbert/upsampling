@@ -1,18 +1,27 @@
 import numpy as np
 
+def ceil(x:int, y:int) -> int:
+    return int(np.ceil(x / y))
 
-def sub_pixel_convolution_data_reuse_patterns(r, H, C, K):
+
+def sub_pixel_convolution_data_reuse_patterns(r, H, C, K, return_total:bool = True):
     M = pow(r, 2) * pow(K, 2) * pow(C, 2) * pow(H, 2)
     W = pow(r, 2) * pow(K, 2) * pow(C, 2)
-    A = (1 + 3 * pow(r, 2)) * pow(H, 2) * C # plus post-processing
-    return M, W, A
+    A = (1 + pow(r, 2)) * pow(H, 2) * C 
+    P = 2 * pow(r, 2) * pow(H, 2) * C # plus pixel shuffle post-processing
+    if not return_total:
+        return M, W, A, P
+    return M, W, A + P
 
 
-def NN_resize_convolution_data_reuse_patterns(r, H, C, K):
+def NN_resize_convolution_data_reuse_patterns(r, H, C, K, return_total:bool = True):
     M = pow(r, 2) * pow(K, 2) * pow(C, 2) * pow(H, 2)
     W = pow(K, 2) * pow(C, 2)
-    A = (1 + 3 * pow(r, 2)) * pow(H, 2) * C # plus pre-processing
-    return M, W, A
+    A = 2 * pow(r, 2) * pow(H, 2) * C
+    P = (1 + pow(r, 2)) * pow(H, 2) * C # plus nearest neighbor intepolation pre-processing
+    if not return_total:
+        return M, W, A, P
+    return M, W, A + P
 
 
 def standard_deconvolution_data_reuse_patterns(r, H, C, K, original_operator="D-SP"):
@@ -23,9 +32,9 @@ def standard_deconvolution_data_reuse_patterns(r, H, C, K, original_operator="D-
         A = (1 + pow(r, 2)) * pow(H, 2) * C
         return M, W, A
     elif original_operator == "D-NN":
-        # Kd = r + 2, S = r, P = 1
-        M = pow(r + 2, 2) * pow(C, 2) * pow(H, 2)
-        W = pow(r + 2, 2) * pow(C, 2)
+        # Kd = r + K - 1, S = r, P = 1
+        M = pow(r + K - 1, 2) * pow(C, 2) * pow(H, 2)
+        W = pow(r + K - 1, 2) * pow(C, 2)
         A = (1 + pow(r, 2)) * pow(H, 2) * C
         return M, W, A
     else:
@@ -40,9 +49,9 @@ def fractionally_strided_deconvolution_data_reuse_patterns(r, H, C, K, original_
         A = (pow(H + (H - 1)*(r - 1), 2) + pow(r, 2) * pow(H, 2)) * C
         return M, W, A
     elif original_operator == "D-NN":
-        # Kd = r + 2, S = r, P = 1
-        M = pow(r + 2, 2) * pow(r, 2) * pow(H, 2) * pow(C, 2)
-        W = pow(r + 2, 2) * pow(C, 2)
+        # Kd = r + K - 1, S = r, P = 1
+        M = pow(r + K - 1, 2) * pow(r, 2) * pow(H, 2) * pow(C, 2)
+        W = pow(r + K - 1, 2) * pow(C, 2)
         A = (pow(H + (H - 1)*(r - 1), 2) + pow(r, 2) * pow(H, 2)) * C
         return M, W, A
     else:
@@ -57,9 +66,9 @@ def reverse_looping_deconvolution_data_reuse_patterns(r, H, C, K, original_opera
         A = (1 + pow(r, 2)) * pow(H, 2) * C
         return M, W, A
     elif original_operator == "D-NN":
-        # Kd = r + 2, S = r, P = 1
-        M = pow(r + 2, 2) * pow(C, 2) * pow(H, 2)
-        W = pow(r + 2, 2) * pow(C, 2)
+        # Kd = r + K - 1, S = r, P = 1
+        M = pow(r + K - 1, 2) * pow(C, 2) * pow(H, 2)
+        W = pow(r + K - 1, 2) * pow(C, 2)
         A = (1 + pow(r, 2)) * pow(H, 2) * C
         return M, W, A
     else:
@@ -67,7 +76,6 @@ def reverse_looping_deconvolution_data_reuse_patterns(r, H, C, K, original_opera
 
 
 def reverse_looping_deconvolution_2_data_reuse_patterns(r, H, C, K, original_operator="D-SP"):
-    assert r >= 2, "upsampling factor needs to be >= 2"
     if original_operator == "D-SP":
         # Kd = Kc * r, S = r, P = r
         M = pow(r, 2) * pow(K, 2) * pow(C, 2) * pow(H, 2)
@@ -75,9 +83,9 @@ def reverse_looping_deconvolution_2_data_reuse_patterns(r, H, C, K, original_ope
         A = (1 + pow(r, 2)) * pow(H, 2) * C
         return M, W, A
     elif original_operator == "D-NN":
-        # Kd = r + 2, S = r, P = 1
-        M = 4 * pow(r, 2) * pow(C, 2) * pow(H, 2)
-        W = pow(r + 2, 2) * pow(C, 2)
+        # Kd = r + K - 1, S = r, P = 1
+        M = pow(ceil(r + K - 1, r), 2) * pow(C, 2) * pow(H, 2) * pow(r, 2)
+        W = pow(r + K - 1, 2) * pow(C, 2)
         A = (1 + pow(r, 2)) * pow(H, 2) * C
         return M, W, A
     else:
@@ -85,7 +93,6 @@ def reverse_looping_deconvolution_2_data_reuse_patterns(r, H, C, K, original_ope
 
 
 def transforming_deconvolution_to_convolution_data_reuse_patterns(r, H, C, K, original_operator="D-SP"):
-    assert r >= 2, "upsampling factor needs to be >= 2"
     if original_operator == "D-SP":
         # Kd = Kc * r, S = r, P = r
         M = pow(r, 2) * pow(K, 2) * pow(C, 2) * pow(H, 2)
@@ -93,9 +100,9 @@ def transforming_deconvolution_to_convolution_data_reuse_patterns(r, H, C, K, or
         A = (1 + pow(r, 2)) * pow(H, 2) * C
         return M, W, A
     elif original_operator == "D-NN":
-        # Kd = r + 2, S = r, P = 1
-        M = 4 * pow(r, 2) * pow(H, 2) * pow(C, 2)
-        W = 4 * pow(r, 2) * pow(C, 2)
+        # Kd = r + K - 1, S = r, P = 1
+        M = pow(ceil(r + K - 1, r), 2) * pow(r, 2) * pow(C, 2) * pow(H, 2)
+        W = pow(ceil(r + K - 1, r), 2) * pow(r, 2) * pow(C, 2)
         A = (1 + pow(r, 2)) * pow(H, 2) * C
         return M, W, A
     else:
