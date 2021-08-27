@@ -1,5 +1,5 @@
 import torch
-
+import torch.nn as nn
 import numpy as np
 
 
@@ -77,6 +77,17 @@ def weight_shuffle(conv_weights:torch.Tensor, scaling_factor:int) -> torch.Tenso
                     oc_c = (scaling_factor**2) * _c + (scaling_factor) * _a + _b
                     deconv_weights[ic_d,oc_d,kh_d,kw_d] = conv_weights[oc_c,ic_c,K - kh_c - 1,K - kw_c - 1]
     return deconv_weights
+
+
+def bias_shuffle(conv_bias:torch.Tensor, scaling_factor:int, input_height:int, input_width:int) -> torch.Tensor:
+    """
+    Bias shuffle - added to support real-world networks
+    """
+    pixel_shuffle = nn.PixelShuffle(scaling_factor)
+    conv_bias = conv_bias.unsqueeze(1).unsqueeze(1)
+    conv_bias = pixel_shuffle(conv_bias).unsqueeze(0)
+    conv_bias = conv_bias.repeat(1, 1, input_height, input_width)
+    return conv_bias
 
 
 def weight_convolution(conv_weights:torch.Tensor, in_channels:int, out_channels:int, scaling_factor:int, kernel_size:int = 3, padding:int = 1):
