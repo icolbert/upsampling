@@ -5,15 +5,16 @@ State-of-the-art deep learning solutions for image upsampling are currently trai
 
 Here, we provide easy-to-understand implementations for all algorithms described in our paper. The code and images used in this repository are free to use as regulated by the license and subject to proper arbitration:
 
-- [[1] Colbert *et al.* (2021) - An Energy-Efficient Edge Computing Paradigm for Convolution-based Image Upsampling](https://arxiv.org/abs/2107.07647)
+- [[1] Colbert *et al.* (2021) - An Energy-Efficient Edge Computing Paradigm for Convolution-based Image Upsampling](https://ieeexplore.ieee.org/abstract/document/9592768)
 
 ```
-@misc{colbert2021energyefficient,
-      title={An Energy-Efficient Edge Computing Paradigm for Convolution-based Image Upsampling}, 
-      author={Ian Colbert and Ken Kreutz-Delgado and Srinjoy Das},
-      year={2021},
-      eprint={2107.07647},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
+@article{colbert2021energy,
+  title={An Energy-Efficient Edge Computing Paradigm for Convolution-based Image Upsampling},
+  author={Colbert, Ian and Kreutz-Delgado, Kenneth and Das, Srinjoy},
+  journal={IEEE Access},
+  volume={9},
+  pages={147967--147984},
+  year={2021},
+  publisher={IEEE}
 }
 ```
